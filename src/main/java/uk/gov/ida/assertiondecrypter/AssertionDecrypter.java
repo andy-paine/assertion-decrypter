@@ -19,15 +19,24 @@ import org.opensaml.xmlsec.encryption.support.InlineEncryptedKeyResolver;
 import org.opensaml.xmlsec.keyinfo.KeyInfoCredentialResolver;
 import org.opensaml.xmlsec.keyinfo.impl.CollectionKeyInfoCredentialResolver;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import uk.gov.ida.saml.deserializers.OpenSamlXMLObjectUnmarshaller;
 import uk.gov.ida.saml.deserializers.parser.SamlObjectParser;
 import uk.gov.ida.saml.serializers.XmlObjectToBase64EncodedStringTransformer;
 
+import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyException;
 import java.security.KeyFactory;
@@ -45,15 +54,41 @@ import static java.util.Collections.singletonList;
 
 public class AssertionDecrypter {
 
-    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidKeySpecException, KeyException, DecryptionException, UnmarshallingException, XMLParserException, URISyntaxException, IOException, ParserConfigurationException, SAXException, InitializationException {
-        if (args.length != 2) {
-            System.out.println("Usage: [app] decryption-key.pk8 encrypted-assertion.xml");
-            System.exit(1);
-        }
+    public static final String NAMESPACE_URI = "urn:oasis:names:tc:SAML:2.0:assertion";
+    public static final String LOCAL_NAME = "EncryptedAssertion";
+
+    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidKeySpecException, KeyException, DecryptionException, UnmarshallingException, XMLParserException, URISyntaxException, IOException, ParserConfigurationException, SAXException, InitializationException, TransformerException {
+        argumentCheck(args);
+
         ((Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME)).setLevel(Level.OFF);
         InitializationService.initialize();
 
-        KeySpec keySpec = new PKCS8EncodedKeySpec(readAllBytes(Paths.get(args[0])));
+        Decrypter decrypter = createDecrypter(args[0]);
+
+        OpenSamlXMLObjectUnmarshaller<EncryptedAssertion> xmlObjectUnmarshaller = new OpenSamlXMLObjectUnmarshaller<>(new SamlObjectParser());
+        EncryptedAssertion encryptedAssertion = xmlObjectUnmarshaller.fromString(readEncryptedAssertionElement(args[1]));
+
+        String base64Assertion = new XmlObjectToBase64EncodedStringTransformer().apply(decrypter.decrypt(encryptedAssertion));
+        System.out.println(new String(Base64.getDecoder().decode(base64Assertion)));
+    }
+
+    private static String readEncryptedAssertionElement(String arg) throws IOException, ParserConfigurationException, SAXException, TransformerException {
+        String xmlInput = new String(readAllBytes(Paths.get(arg)));
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        Document document = factory.newDocumentBuilder().parse(new InputSource(new StringReader(xmlInput)));
+
+        Node encryptedAssertionElement = document.getElementsByTagNameNS(NAMESPACE_URI, LOCAL_NAME).item(0);
+
+        StringWriter output = new StringWriter();
+        TransformerFactory.newInstance()
+            .newTransformer()
+            .transform(new DOMSource(encryptedAssertionElement), new StreamResult(output));
+        return output.toString();
+    }
+
+    private static Decrypter createDecrypter(String arg) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, KeyException {
+        KeySpec keySpec = new PKCS8EncodedKeySpec(readAllBytes(Paths.get(arg)));
         KeyFactory keyFactory;
 
         keyFactory = KeyFactory.getInstance("RSA");
@@ -67,12 +102,13 @@ public class AssertionDecrypter {
         List<EncryptedKeyResolver> encKeyResolvers = Arrays.asList(encryptedElementTypeEncryptedKeyResolver, new InlineEncryptedKeyResolver());
 
         ChainingEncryptedKeyResolver encryptedKeyResolver = new ChainingEncryptedKeyResolver(encKeyResolvers);
-        Decrypter decrypter = new Decrypter(null, kekResolver, encryptedKeyResolver);
+        return new Decrypter(null, kekResolver, encryptedKeyResolver);
+    }
 
-        OpenSamlXMLObjectUnmarshaller<EncryptedAssertion> xmlObjectUnmarshaller = new OpenSamlXMLObjectUnmarshaller<>(new SamlObjectParser());
-        EncryptedAssertion encryptedAssertion = xmlObjectUnmarshaller.fromString(new String(readAllBytes(Paths.get(args[1]))));
-
-        String base64Assertion = new XmlObjectToBase64EncodedStringTransformer().apply(decrypter.decrypt(encryptedAssertion));
-        System.out.println(new String(Base64.getDecoder().decode(base64Assertion)));
+    private static void argumentCheck(String[] args) {
+        if (args.length != 2) {
+            System.out.println("Usage: [app] decryption-key.pk8 encrypted-assertion.xml");
+            System.exit(1);
+        }
     }
 }
