@@ -7,12 +7,15 @@ apply plugin: 'application'
 sourceCompatibility = 1.8
 
 repositories {
-    maven { url 'https://artifactory.ida.digital.cabinet-office.gov.uk/artifactory/whitelisted-repos' }
+  mavenCentral()
+  maven {
+    url  "https://dl.bintray.com/alphagov/maven-test"
+  }
 }
 
 dependencies {
     compile("org.opensaml:opensaml-saml-api:3.3.0",
-            "uk.gov.ida:saml-serializers:3.3.0-104")
+            "uk.gov.ida:saml-serializers:3.3.0-145")
 }
 
 mainClassName = 'uk.gov.ida.assertiondecrypter.AssertionDecrypter'
