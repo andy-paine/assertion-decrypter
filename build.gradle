@@ -15,7 +15,7 @@ repositories {
 
 dependencies {
     compile("org.opensaml:opensaml-saml-api:3.3.0",
-            "uk.gov.ida:saml-serializers:3.3.0-145")
+            "uk.gov.ida:saml-serializers:3.3.0-153")
 }
 
 mainClassName = 'uk.gov.ida.assertiondecrypter.AssertionDecrypter'

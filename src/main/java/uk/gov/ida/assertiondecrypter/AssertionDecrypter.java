@@ -3,6 +3,7 @@ package uk.gov.ida.assertiondecrypter;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import net.shibboleth.utilities.java.support.xml.XMLParserException;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.opensaml.core.config.InitializationException;
 import org.opensaml.core.config.InitializationService;
 import org.opensaml.core.xml.io.UnmarshallingException;
@@ -42,6 +43,7 @@ import java.security.KeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.Security;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -58,6 +60,8 @@ public class AssertionDecrypter {
     public static final String LOCAL_NAME = "EncryptedAssertion";
 
     public static void main(String[] args) throws NoSuchAlgorithmException, InvalidKeySpecException, KeyException, DecryptionException, UnmarshallingException, XMLParserException, URISyntaxException, IOException, ParserConfigurationException, SAXException, InitializationException, TransformerException {
+        Security.addProvider(new BouncyCastleProvider());
+
         argumentCheck(args);
 
         ((Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME)).setLevel(Level.OFF);
